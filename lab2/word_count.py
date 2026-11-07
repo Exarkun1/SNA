@@ -2,17 +2,22 @@
 
 import csv
 from collections import Counter
+from collections.abc import Set
 from pathlib import Path
 
 import pymorphy3
 
 from .preprocessing import tokenize
 
-STOP_POS = {"PREP", "CONJ", "PRCL", "NPRO", "INTJ"}
-
-
-def lemmatize_texts(texts: list[str], keep_stop_words: bool = False) -> list[str]:
-    """Нормализовать слова, сохраняя порядок документов и слов внутри них"""
+def lemmatize_texts(
+    texts: list[str],
+    keep_stop_words: bool = False,
+    *,
+    stop_words: Set[str] = frozenset(),
+    stop_pos: Set[str] = frozenset(),
+    stop_tags: Set[str] = frozenset(),
+) -> list[str]:
+    """Лемматизировать тексты с переданными исключениями"""
     morph = pymorphy3.MorphAnalyzer()
     cache: dict[str, str] = {}
     documents = []
@@ -23,7 +28,11 @@ def lemmatize_texts(texts: list[str], keep_stop_words: bool = False) -> list[str
                 parsed = morph.parse(word)[0]
                 cache[word] = (
                     parsed.normal_form
-                    if keep_stop_words or parsed.tag.POS not in STOP_POS else ""
+                    if keep_stop_words or (
+                        parsed.tag.POS not in stop_pos
+                        and stop_tags.isdisjoint(parsed.tag.grammemes)
+                        and parsed.normal_form not in stop_words
+                    ) else ""
                 )
             if cache[word]:
                 lemmas.append(cache[word])
